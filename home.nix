@@ -102,6 +102,7 @@ in rec {
   dconf.settings = {
     "org/gnome/mutter" = {
       experimental-features = ["scale-monitor-framebuffer"];
+      edge-tiling = true;
     };
     "org/gnome/desktop/input-sources" = {
       xkb-options = ["terminate:ctrl_alt_bksp" "caps:escape"];
