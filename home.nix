@@ -15,6 +15,8 @@ in rec {
   # release notes.
   home.stateVersion = "23.11"; # Please read the comment before changing.
 
+  fonts.fontconfig.enable = true;
+
   # The home.packages option allows you to install Nix packages into your
   # environment.
   home.packages = with pkgs; [
@@ -36,12 +38,24 @@ in rec {
     # '')
     git
     file
-    libsForQt5.kgpg
+    #libsForQt5.kgpg
     ripgrep
-    direnv
-    nix-direnv
     kubectl
     talosctl
+    xxd
+    #pinentry-gnome
+    gnomeExtensions.windownavigator
+    gnomeExtensions.gsconnect
+    (pkgs.writeShellScriptBin "toggle-vpn" ''
+      name='Homelab (strongswan)'
+      nmcli connection show "$name" | grep VPN.VPN-STATE | grep -q '5 - VPN connected'
+      if [[ $? == 0 ]]; then
+        nmcli connection down "$name"
+      else
+        nmcli connection up "$name"
+      fi
+    '')
+    (pkgs.nerdfonts.override { fonts = [ "SourceCodePro" ]; })
   ];
 
   # Home Manager is pretty good at managing dotfiles. The primary way to manage
@@ -85,8 +99,50 @@ in rec {
     hm = "home-manager";
   };
 
+  dconf.settings = {
+    "org/gnome/mutter" = {
+      experimental-features = ["scale-monitor-framebuffer"];
+    };
+    "org/gnome/desktop/input-sources" = {
+      xkb-options = ["terminate:ctrl_alt_bksp" "caps:escape"];
+    };
+    "org/gnome/desktop/interface" = {
+      color-scheme = "prefer-dark";
+    };
+    "org/gnome/Console" = {
+      custom-font = "SauceCodePro Nerd Font Mono 10";
+      theme = "night";
+      use-system-font = false;
+    };
+    "org/gnome/shell" = {
+      enabled-extensions=["windowsNavigator@gnome-shell-extensions.gcampax.github.com" "gsconnect@andyholmes.github.io"];
+      disabled-extensions=[];
+      favorite-apps=["org.mozilla.firefox.desktop" "org.gnome.Nautilus.desktop" "org.gnome.Console.desktop"];
+    };
+  };
+
+  gtk = {
+    enable = true;
+    theme = {
+      name = "adw-gtk3-dark";
+      package = pkgs.adw-gtk3;
+    };
+    gtk3.extraConfig = {
+      gtk-application-prefer-dark-theme = true;
+    };
+    gtk4.extraConfig = {
+      gtk-application-prefer-dark-theme = true;
+    };
+  };
+
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
+
+  programs.direnv = {
+    enable = true;
+    enableBashIntegration = true;
+    nix-direnv.enable = true;
+  };
 
   programs.bash = {
     enable = true;
@@ -103,6 +159,23 @@ in rec {
     '';
   };
 
+  programs.gpg = {
+    enable = true;
+    scdaemonSettings = {
+      disable-ccid = true;
+      pcsc-shared = true;
+      disable-application = "piv";
+    };
+    package = pkgs.gnupg.overrideAttrs (finalAttrs: prevAttrs: {
+      patches = prevAttrs.patches ++ [ /etc/nixos/gnupg.patch ];
+    });
+  };
+  services.gpg-agent = {
+    enable = true;
+    enableSshSupport = true;
+    pinentryFlavor = "gnome3";
+  };
+
   programs.nixvim = {
     enable = true;
     extraPlugins = [ zenburn ];
@@ -117,8 +190,27 @@ in rec {
       mouse = "";
     };
     plugins = {
-      nvim-cmp.enable = true;
+      nvim-cmp = {
+        enable = true;
+        sources = [
+          { name = "nvim_lsp"; }
+          { name = "path"; }
+        ];
+      };
+      lualine.enable = true;
+      lspkind.enable = true;
+      telescope.enable = true;
+      trouble.enable = true;
+      gitgutter.enable = true;
+      diffview.enable = true;
       cmp-nvim-lsp.enable = true;
+      dap = {
+        enable = true;
+        extensions = {
+          dap-go.enable = true;
+          dap-ui.enable = true;
+        };
+      };
       lsp = {
         enable = true;
         keymaps = {

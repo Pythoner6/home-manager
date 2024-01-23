@@ -26,13 +26,13 @@
       homeConfigurations."joseph" = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
         modules = [ 
-	  ./home.nix 
-	  nixvim.homeManagerModules.nixvim
-	];
-	extraSpecialArgs = {
+          ./home.nix 
+          nixvim.homeManagerModules.nixvim
+        ];
+        extraSpecialArgs = {
           username = "joseph";
           zenburn = zenburn.packages.${system}.default;
-	};
+	      };
       };
     };
 }
