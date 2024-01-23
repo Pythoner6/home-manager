@@ -167,7 +167,7 @@ in rec {
       disable-application = "piv";
     };
     package = pkgs.gnupg.overrideAttrs (finalAttrs: prevAttrs: {
-      patches = prevAttrs.patches ++ [ /etc/nixos/gnupg.patch ];
+      patches = prevAttrs.patches ++ [ ./gnupg.patch ];
     });
   };
   services.gpg-agent = {
