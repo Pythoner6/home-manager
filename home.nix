@@ -43,9 +43,13 @@ in rec {
     kubectl
     talosctl
     xxd
+    unzip
     #pinentry-gnome
     gnomeExtensions.windownavigator
     gnomeExtensions.gsconnect
+    gnomeExtensions.hibernate-status-button
+    gnomeExtensions.steal-my-focus-window
+    qemu_kvm
     (pkgs.writeShellScriptBin "toggle-vpn" ''
       name='Homelab (strongswan)'
       nmcli connection show "$name" | grep VPN.VPN-STATE | grep -q '5 - VPN connected'
@@ -109,16 +113,42 @@ in rec {
     };
     "org/gnome/desktop/interface" = {
       color-scheme = "prefer-dark";
+      show-battery-percentage = true;
     };
     "org/gnome/Console" = {
       custom-font = "SauceCodePro Nerd Font Mono 10";
       theme = "night";
       use-system-font = false;
     };
+    "org/gnome/settings-daemon/plugins/power" = {
+      sleep-inactive-battery-type = "suspend";
+      sleep-inactive-battery-timeout = 900;
+      sleep-inactive-ac-type = "suspend";
+      sleep-inactive-ac-timeout = 900;
+      power-saver-profile-on-low-battery = true;
+    };
     "org/gnome/shell" = {
-      enabled-extensions=["windowsNavigator@gnome-shell-extensions.gcampax.github.com" "gsconnect@andyholmes.github.io"];
-      disabled-extensions=[];
-      favorite-apps=["org.mozilla.firefox.desktop" "org.gnome.Nautilus.desktop" "org.gnome.Console.desktop"];
+      disabled-extensions = [];
+      enabled-extensions = [
+        "windowsNavigator@gnome-shell-extensions.gcampax.github.com"
+        "gsconnect@andyholmes.github.io"
+        "hibernate-status@dromi"
+        "steal-my-focus-window@steal-my-focus-window"
+      ];
+      favorite-apps = [
+        "org.mozilla.firefox.desktop"
+        "org.gnome.Nautilus.desktop"
+        "org.gnome.Console.desktop"
+      ];
+    };
+    "org/gnome/shell/extensions/hibernate-status-button" = {
+      show-suspend-then-hibernate = false;
+      show-hybrid-sleep = false;
+      show-suspend = false;
+      show-hibernate = true;
+      show-hibernate-dialog = true;
+      show-shutdown = true;
+      show-restart = true;
     };
   };
 
@@ -189,18 +219,110 @@ in rec {
       tabstop = 2;
       softtabstop = 2;
       mouse = "";
+      scrolloff = 15;
     };
+    keymaps = [
+      {
+        mode = "i";
+        key = "<C-p>";
+        lua = true;
+        action = ''
+          function()
+            vim.lsp.buf.signature_help()
+          end
+        '';
+      }
+      {
+        mode = "i";
+        key = "<Tab>";
+        options = { silent = true; expr = true; remap = true; };
+        lua = true;
+        action = ''
+          function()
+            local luasnip = require'luasnip' 
+            if luasnip.expand_or_jumpable() then
+              luasnip.expand_or_jump()
+            else
+              vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Tab>", true, false, true), "n", false)
+            end
+          end
+        '';
+      }
+      {
+        mode = "i";
+        key = "<S-Tab>";
+        options.silent = true;
+        action = "<cmd>lua require'luasnip'.jump(-1)<Cr>";
+      }
+      {
+        mode = "s";
+        key = "<Tab>";
+        options.silent = true;
+        action = "<cmd>lua require'luasnip'.jump(1)<Cr>";
+      }
+      {
+        mode = "s";
+        key = "<S-Tab>";
+        options.silent = true;
+        action = "<cmd>lua require'luasnip'.jump(-1)<Cr>";
+      }
+    ];
     plugins = {
+      rust-tools = {
+        serverPackage = null;
+      };
+      luasnip = {
+        enable = true;
+      };
+      telescope = {
+        enable = true;
+        keymaps = {
+          "<leader>ff" = "git_files";
+          "<leader>fo" = "oldfiles";
+          "<leader>fb" = "buffers";
+          "<leader>fg" = "live_grep";
+        };
+      };
       nvim-cmp = {
         enable = true;
+        snippet.expand = "luasnip";
+        mapping = {
+          "<C-Space>" = "cmp.mapping.complete()";
+          "<C-j>" = "cmp.mapping.select_next_item()";
+          "<C-k>" = "cmp.mapping.select_prev_item()";
+          "<C-e>" = "cmp.mapping.close()";
+          #"<CR>" = "cmp.mapping.confirm({ select = false })";
+          "<CR>" = ''
+            function(fallback)
+              if not cmp.visible() or not cmp.get_selected_entry() or cmp.get_selected_entry().source.name == 'nvim_lsp_signature_help' then
+                fallback()
+              else
+                cmp.confirm({ select = false })
+              end
+            end
+          '';
+          #"<Tab>" = ''
+          #  function(fallback)
+          #    if cmp.visible() then
+          #      cmp.select_next_item()
+          #    else
+          #      fallback()
+          #    end
+          #  end
+          #'';
+        };
+        completion = {
+          autocomplete = ["TextChanged"];
+        };
         sources = [
           { name = "nvim_lsp"; }
           { name = "path"; }
+          { name = "nvim_lsp_signature_help"; }
+          { name = "luasnip"; }
         ];
       };
       lualine.enable = true;
       lspkind.enable = true;
-      telescope.enable = true;
       trouble.enable = true;
       gitgutter.enable = true;
       diffview.enable = true;
@@ -232,6 +354,7 @@ in rec {
           gopls.enable = true;
           rust-analyzer = {
             enable = true;
+            installLanguageServer = false;
             installCargo = false;
             installRustc = false;
           };
