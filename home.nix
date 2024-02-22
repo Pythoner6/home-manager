@@ -37,6 +37,7 @@ in rec {
     #   echo "Hello, ${config.home.username}!"
     # '')
     git
+    lazygit
     file
     #libsForQt5.kgpg
     ripgrep
@@ -173,6 +174,11 @@ in rec {
     enable = true;
     enableBashIntegration = true;
     nix-direnv.enable = true;
+    config = {
+      global = {
+        hide_env_diff = true;
+      };
+    };
   };
 
   programs.bash = {
@@ -209,7 +215,40 @@ in rec {
 
   programs.nixvim = {
     enable = true;
-    extraPlugins = [ zenburn ];
+    extraPlugins = [ 
+      zenburn 
+      (pkgs.vimPlugins.lazygit-nvim.overrideAttrs (prev: final: {
+        patches = [./lazygit.nvim.patch];
+      }))
+    ];
+    extraConfigLua = let 
+      lazyGitConfig = pkgs.writeText "lazygit.yaml" ''
+        git:
+          paging:
+            colorArg: always
+            pager: ${pkgs.delta}/bin/delta --dark --syntax-theme zenburn --paging=never
+          autoFetch: false
+          overrideGpg: false
+        gui:
+          theme:
+            activeBorderColor:
+            - "#6fbf6f"
+            - bold
+            selectedLineBgColor:
+            - "#434443"
+            - bold
+            unstagedChangesColor:
+            - "#cc6363"
+            optionsTextColor:
+            - "#6c6c9c"
+      '';
+    in ''
+      do
+        vim.g.lazygit_use_custom_config_file_path = 1
+        vim.g.lazygit_config_file_path = '${lazyGitConfig}'
+        print(vim.g.lazygit_use_custom_config_file_path)
+      end
+    '';
     colorscheme = "zenburn";
     globals.mapleader = " ";
     options = {
@@ -222,6 +261,11 @@ in rec {
       scrolloff = 15;
     };
     keymaps = [
+      {
+        mode = "n";
+        key = "<Leader>g";
+        action = "<cmd>LazyGitCurrentFile<CR>";
+      }
       {
         mode = "i";
         key = "<C-p>";
@@ -268,11 +312,20 @@ in rec {
       }
     ];
     plugins = {
+      neogit = {
+        enable = true;
+      };
       rust-tools = {
         serverPackage = null;
       };
       luasnip = {
         enable = true;
+      };
+      toggleterm = {
+        enable = true;
+        openMapping = "<C-\\>";
+        terminalMappings = true;
+        insertMappings = false;
       };
       telescope = {
         enable = true;
