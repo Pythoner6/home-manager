@@ -3,13 +3,14 @@
 
   inputs = {
     # Specify the source of Home Manager and Nixpkgs.
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
+    nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
     home-manager = {
-      url = "github:nix-community/home-manager/release-23.11";
+      url = "github:nix-community/home-manager/release-24.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixvim = {
-      url = "github:nix-community/nixvim/nixos-23.11";
+      url = "github:nix-community/nixvim/nixos-24.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     zenburn = {
@@ -18,10 +19,11 @@
     };
   };
 
-  outputs = { nixpkgs, home-manager, nixvim, zenburn, ... }:
+  outputs = { nixpkgs, nixpkgs-unstable, home-manager, nixvim, zenburn, ... }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      pkgs-unstable = nixpkgs-unstable.legacyPackages.${system};
     in {
       homeConfigurations."joseph" = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
@@ -30,6 +32,7 @@
           nixvim.homeManagerModules.nixvim
         ];
         extraSpecialArgs = {
+          inherit pkgs-unstable;
           username = "joseph";
           zenburn = zenburn.packages.${system}.default;
 	      };

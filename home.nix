@@ -1,5 +1,5 @@
 { config, pkgs, specialArgs, ... }: let 
-  inherit (specialArgs) zenburn username;
+  inherit (specialArgs) zenburn username pkgs-unstable;
 in rec {
   # Home Manager needs a bit of information about you and the paths it should
   # manage.
@@ -19,7 +19,9 @@ in rec {
 
   # The home.packages option allows you to install Nix packages into your
   # environment.
-  home.packages = with pkgs; [
+  home.packages = (with pkgs-unstable; [
+    ghostty
+  ]) ++ (with pkgs; [
     # # Adds the 'hello' command to your environment. It prints a friendly
     # # "Hello, world!" when run.
     # pkgs.hello
@@ -36,7 +38,11 @@ in rec {
     # (pkgs.writeShellScriptBin "my-hello" ''
     #   echo "Hello, ${config.home.username}!"
     # '')
+    (prismlauncher.override {
+      jdks = [ jdk21 ];
+    })
     git
+    nix-output-monitor
     lazygit
     file
     #libsForQt5.kgpg
@@ -45,13 +51,14 @@ in rec {
     talosctl
     xxd
     unzip
+    #gns3-gui
     #pinentry-gnome
     gnomeExtensions.windownavigator
     gnomeExtensions.gsconnect
     gnomeExtensions.hibernate-status-button
     gnomeExtensions.steal-my-focus-window
     qemu_kvm
-    (pkgs.writeShellScriptBin "toggle-vpn" ''
+    (writeShellScriptBin "toggle-vpn" ''
       name='Homelab (strongswan)'
       nmcli connection show "$name" | grep VPN.VPN-STATE | grep -q '5 - VPN connected'
       if [[ $? == 0 ]]; then
@@ -60,8 +67,9 @@ in rec {
         nmcli connection up "$name"
       fi
     '')
-    (pkgs.nerdfonts.override { fonts = [ "SourceCodePro" ]; })
-  ];
+    (nerdfonts.override { fonts = [ "SourceCodePro" ]; })
+    helix
+  ]);
 
   # Home Manager is pretty good at managing dotfiles. The primary way to manage
   # plain files is through 'home.file'.
@@ -210,16 +218,25 @@ in rec {
   services.gpg-agent = {
     enable = true;
     enableSshSupport = true;
-    pinentryFlavor = "gnome3";
+    pinentryPackage = pkgs.pinentry-qt;
+    #pinentryPackage = pkgs.pinentry-tty;
+    #pinentryFlavor = "gnome3";
   };
 
   programs.nixvim = {
     enable = true;
     extraPlugins = [ 
       zenburn 
-      (pkgs.vimPlugins.lazygit-nvim.overrideAttrs (prev: final: {
-        patches = [./lazygit.nvim.patch];
-      }))
+      (pkgs.fetchFromGitHub {
+        owner = "apple";
+        repo = "pkl-neovim";
+        rev = "a0ae099c7eb926150ee0a126b1dd78086edbe3fc";
+        hash = "sha256-Lv5WZCthqP2wtJy35D/WCE+5OBnUmw3E4ETnL95IuCw=";
+      })
+      pkgs.vimPlugins.lazygit-nvim
+      #(pkgs.vimPlugins.lazygit-nvim.overrideAttrs (prev: final: {
+      #  patches = [./lazygit.nvim.patch];
+      #}))
     ];
     extraConfigLua = let 
       lazyGitConfig = pkgs.writeText "lazygit.yaml" ''
@@ -246,12 +263,11 @@ in rec {
       do
         vim.g.lazygit_use_custom_config_file_path = 1
         vim.g.lazygit_config_file_path = '${lazyGitConfig}'
-        print(vim.g.lazygit_use_custom_config_file_path)
       end
     '';
     colorscheme = "zenburn";
     globals.mapleader = " ";
-    options = {
+    opts = {
       expandtab = true;
       number = true;
       shiftwidth = 2;
@@ -269,8 +285,7 @@ in rec {
       {
         mode = "i";
         key = "<C-p>";
-        lua = true;
-        action = ''
+        action.__raw = ''
           function()
             vim.lsp.buf.signature_help()
           end
@@ -280,8 +295,7 @@ in rec {
         mode = "i";
         key = "<Tab>";
         options = { silent = true; expr = true; remap = true; };
-        lua = true;
-        action = ''
+        action.__raw = ''
           function()
             local luasnip = require'luasnip' 
             if luasnip.expand_or_jumpable() then
@@ -321,11 +335,40 @@ in rec {
       luasnip = {
         enable = true;
       };
+      web-devicons.enable = true;
+      treesitter = {
+        enable = true;
+        grammarPackages = pkgs.vimPlugins.nvim-treesitter.passthru.allGrammars ++ [
+          (pkgs.tree-sitter.buildGrammar {
+            language = "pkl";
+            version = "0.16.0";
+            src = pkgs.fetchFromGitHub {
+              owner = "apple";
+              repo = "tree-sitter-pkl";
+              rev = "main";
+              hash = "sha256-6cO968oEF+pcPGm4jiIC3layFzQf6eQa4m6iOReeo4w=";
+            };
+          })
+          (pkgs.tree-sitter.buildGrammar {
+            language = "cue";
+            version = "dev";
+            src = pkgs.fetchFromGitHub {
+              owner = "eonpatapon";
+              repo = "tree-sitter-cue";
+              rev = "8a5f273bfa281c66354da562f2307c2d394b6c81";
+              hash = "sha256-uV7Tl41PCU+8uJa693km5xvysvbptbT7LvGyYIelspk=";
+            };
+          })
+        ];
+      };
       toggleterm = {
         enable = true;
-        openMapping = "<C-\\>";
-        terminalMappings = true;
-        insertMappings = false;
+        settings = {
+          open_mapping = "[[<C-\\>]]";
+          terminalMappings = true;
+          insertMappings = false;
+          direction = "tab";
+        };
       };
       telescope = {
         enable = true;
@@ -336,9 +379,8 @@ in rec {
           "<leader>fg" = "live_grep";
         };
       };
-      nvim-cmp = {
-        enable = true;
-        snippet.expand = "luasnip";
+      cmp.enable = true;
+      cmp.settings = {
         mapping = {
           "<C-Space>" = "cmp.mapping.complete()";
           "<C-j>" = "cmp.mapping.select_next_item()";
@@ -373,6 +415,7 @@ in rec {
           { name = "nvim_lsp_signature_help"; }
           { name = "luasnip"; }
         ];
+        snippet.expand = "function(args) require('luasnip').lsp_expand(args.body) end";
       };
       lualine.enable = true;
       lspkind.enable = true;
@@ -405,9 +448,9 @@ in rec {
         servers = {
           nixd.enable = true;
           gopls.enable = true;
-          rust-analyzer = {
+          rust_analyzer = {
             enable = true;
-            installLanguageServer = false;
+            #installLanguageServer = false;
             installCargo = false;
             installRustc = false;
           };
