@@ -38,6 +38,7 @@ in rec {
     # (pkgs.writeShellScriptBin "my-hello" ''
     #   echo "Hello, ${config.home.username}!"
     # '')
+    wl-clipboard
     (prismlauncher.override {
       jdks = [ jdk21 ];
     })
@@ -67,7 +68,8 @@ in rec {
         nmcli connection up "$name"
       fi
     '')
-    (nerdfonts.override { fonts = [ "SourceCodePro" ]; })
+    #(nerdfonts.override { fonts = [ "SourceCodePro" ]; })
+    nerd-fonts.sauce-code-pro
     helix
   ]);
 
@@ -218,7 +220,7 @@ in rec {
   services.gpg-agent = {
     enable = true;
     enableSshSupport = true;
-    pinentryPackage = pkgs.pinentry-qt;
+    pinentry.package = pkgs.pinentry-qt;
     #pinentryPackage = pkgs.pinentry-tty;
     #pinentryFlavor = "gnome3";
   };
@@ -423,13 +425,9 @@ in rec {
       gitgutter.enable = true;
       diffview.enable = true;
       cmp-nvim-lsp.enable = true;
-      dap = {
-        enable = true;
-        extensions = {
-          dap-go.enable = true;
-          dap-ui.enable = true;
-        };
-      };
+      dap.enable = true;
+      dap-go.enable = true;
+      dap-ui.enable = true;
       lsp = {
         enable = true;
         keymaps = {
